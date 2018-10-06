@@ -10,39 +10,52 @@ import (
 	"time"
 )
 
-type sshConnectInfo struct {
+// connectInfo could potentially be used for other connection attempts, not just SSH
+type connectInfo struct {
 	targetUser map[string]int
 	count      int
 	lastSeen   time.Time
 }
 
-func parseFailedPasswordLine(line string, blacklist map[string]sshConnectInfo) error {
+// parseSSHFailedPasswordLine checks SSH failed password and feeds the blacklist struct
+func parseSSHFailedPasswordLine(line string, blacklist map[string]*connectInfo) error {
 	lineContent := strings.Split(line, " ")
 	if len(lineContent) != 9 {
 		return errors.New("number of fields in Failed Password not 9")
 	}
-	sourceIP := lineContent[6]
+	sourceIP := lineContent[5]
+	targetUser := lineContent[3]
 	_, ok := blacklist[sourceIP]
 	if ok {
 		blacklist[sourceIP].count++
+		_, ok := blacklist[sourceIP].targetUser[targetUser]
+		if ok {
+			blacklist[sourceIP].targetUser[targetUser]++
+		} else {
+			blacklist[sourceIP].targetUser[targetUser] = 1
+		}
 	} else {
-		blacklist[lineContent[6]] = sshConnectInfo{
-			targetUser: {lineContent[4]: 1},
+		blacklist[sourceIP] = &connectInfo{
+			targetUser: map[string]int{targetUser: 1},
 			count:      1,
 			lastSeen:   time.Now(),
 		}
 	}
 	return nil
 }
-func parseSSHLogLine(line string, blacklist map[string]sshConnectInfo) error {
+
+// parseSSHLogLine should cover main ssh log lines related to errors.
+func parseSSHLogLine(line string, blacklist map[string]*connectInfo) error {
 	if strings.HasPrefix(line, "Failed password for ") {
-		if err := parseFailedPasswordLine(line, blacklist); err != nil {
+		if err := parseSSHFailedPasswordLine(line, blacklist); err != nil {
 			return err
 		}
 	}
 	return nil
 }
-func readStdIn(blacklist map[string]sshConnectInfo) {
+
+// readStdIn shows that ideally we are reading a pipe
+func readStdIn(blacklist map[string]*connectInfo) {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		text, err := reader.ReadString('\n')
@@ -53,7 +66,7 @@ func readStdIn(blacklist map[string]sshConnectInfo) {
 	}
 }
 func main() {
-	var blacklist map[string]sshConnectInfo
+	var blacklist map[string]*connectInfo
 	readStdIn(blacklist)
 	fmt.Println("parser")
 }
