@@ -19,6 +19,8 @@ type connectInfo struct {
 
 // parseSSHFailedPasswordLine checks SSH failed password and feeds the blacklist struct
 func parseSSHFailedPasswordLine(line string, blacklist map[string]*connectInfo) error {
+	// Example of error line:
+	// "Failed password for root from WW.XX.YY.ZZ port 6721 ssh2"
 	lineContent := strings.Split(line, " ")
 	if len(lineContent) != 9 {
 		return errors.New("number of fields in Failed Password not 9")
