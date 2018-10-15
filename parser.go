@@ -93,23 +93,31 @@ func exportJSON(blacklist map[string]*connectInfo) {
 	max = max + 1
 	scale := (max - min) / 10
 	buckets := [10]string{}
-	fmt.Printf("Max is %f, Min is %f, scale is %f\n", max, min, scale)
+	// This is actually a char.
+	maxItemsPerBucket := 8000
+	// fmt.Printf("Max is %f, Min is %f, scale is %f\n", max, min, scale)
 	// Create dataset "buckets" for the data:
 	for _, ip := range blacklist {
-		bucketNumber := int(math.Floor((float64(ip.count) - min) / scale))
+		ipCount := float64(ip.count)
+		bucketNumber := int(math.Floor((ipCount - min) / scale))
+		if len(buckets[bucketNumber]) > maxItemsPerBucket {
+			continue
+		}
+		// max - min is 1
+		scaledCount := (ipCount - min) / (max - min)
 		if buckets[bucketNumber] != "" {
 			buckets[bucketNumber] += ","
 		}
-		buckets[bucketNumber] += fmt.Sprintf("%f,%f,%d", ip.latitude, ip.longitude, ip.count)
+		buckets[bucketNumber] += fmt.Sprintf("%f,%f,%f", ip.latitude, ip.longitude, scaledCount)
 	}
-	fmt.Println("var data = [")
+	fmt.Print("[\n")
 	for i, bucketData := range buckets {
 		if i > 0 {
 			fmt.Println(",")
 		}
-		fmt.Printf("['series%d',[%s]]", i, bucketData)
+		fmt.Printf("  [\"%d\",[%s]]\n", i, bucketData)
 	}
-	fmt.Println("];")
+	fmt.Print("]")
 }
 
 // readStdIn shows that ideally we are reading a pipe
