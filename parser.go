@@ -134,7 +134,7 @@ func readStdIn(blacklist map[string]*connectInfo, db *geoip2.Reader) {
 		parseSSHLogLine(text, blacklist, db)
 	}
 }
-func main() {
+func parse() {
 	blacklist := map[string]*connectInfo{}
 	db, err := geoip2.Open("GeoLite2-City.mmdb")
 	if err != nil {
