@@ -1,0 +1,63 @@
+package main
+
+import (
+	"net/http"
+	"os"
+
+	"github.com/go-kit/kit/log"
+	kitprometheus "github.com/go-kit/kit/metrics/prometheus"
+	httptransport "github.com/go-kit/kit/transport/http"
+	stdprometheus "github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+)
+
+func main() {
+	logger := log.NewLogfmtLogger(os.Stderr)
+
+	fieldKeys := []string{"method", "error"}
+	requestCount := kitprometheus.NewCounterFrom(stdprometheus.CounterOpts{
+		Namespace: "my_group",
+		Subsystem: "blacklist_service",
+		Name:      "request_count",
+		Help:      "Number of requests received.",
+	}, fieldKeys)
+	requestLatency := kitprometheus.NewSummaryFrom(stdprometheus.SummaryOpts{
+		Namespace: "my_group",
+		Subsystem: "blacklist_service",
+		Name:      "request_latency_microseconds",
+		Help:      "Total duration of requests in microseconds.",
+	}, fieldKeys)
+	countResult := kitprometheus.NewSummaryFrom(stdprometheus.SummaryOpts{
+		Namespace: "my_group",
+		Subsystem: "blacklist_service",
+		Name:      "count_result",
+		Help:      "The result of each count method.",
+	}, []string{}) // no fields here
+
+	var svc BlacklistService
+	svc = blacklistService{}
+	svc = loggingMiddleware{logger, svc}
+	svc = instrumentingMiddleware{requestCount, requestLatency, countResult, svc}
+
+	getIPDetailsHandler := httptransport.NewServer(
+		makeGetIPDetailsEndpoint(svc),
+		decodeGetIPDetailsRequest,
+		encodeResponse,
+	)
+	getIPCountHandler := httptransport.NewServer(
+		makeGetIPCountEndpoint(svc),
+		decodeGetIPCountRequest,
+		encodeResponse,
+	)
+	getIPsActiveSinceHandler := httptransport.NewServer(
+		makeGetIPsActiveSinceEndpoint(svc),
+		decodeGetIPsActiveSinceRequest,
+		encodeResponse,
+	)
+	http.Handle("/getIPDetails", getIPDetailsHandler)
+	http.Handle("/getIPCount", getIPCountHandler)
+	http.Handle("/getIPsActiveSince", getIPsActiveSinceHandler)
+	http.Handle("/metrics", promhttp.Handler())
+	logger.Log("msg", "HTTP", "addr", ":8080")
+	logger.Log("err", http.ListenAndServe(":8080", nil))
+}

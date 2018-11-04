@@ -32,7 +32,7 @@ func (b blacklistService) GetIPDetails(ip string) (*connectInfo, error) {
 // GetIPCount retuns the count inside of a connectionInfo
 func (b blacklistService) GetIPCount(ip string) int {
 	ipData, err := b.GetIPDetails(ip)
-	if err != nil {
+	if err == nil {
 		return ipData.count
 	}
 	return 0
@@ -43,7 +43,7 @@ func (b blacklistService) GetIPsActiveSince(epoch int64) []*connectInfo {
 	res := make([]*connectInfo, 0)
 	for _, ip := range b.blacklistTable {
 		if ip.lastSeen.Unix() > epoch {
-			res := append(res, ip)
+			res = append(res, ip)
 		}
 	}
 	return res

@@ -3,33 +3,41 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"net/http"
+	"strconv"
 
-	httptransport "github.com/go-kit/kit/transport/http"
+	"github.com/go-kit/kit/endpoint"
 )
 
-func main() {
-	svc := blacklistService{}
-	getIPDetailsHandler := httptransport.NewServer(
-		makeGetIPDetailsEndpoint(svc),
-		decodeGetIPDetailsRequest,
-		encodeResponse,
-	)
-	getIPCountHandler := httptransport.NewServer(
-		makeGetIPCountEndpoint(svc),
-		decodeGetIPCountRequest,
-		encodeResponse,
-	)
-	getIPsActiveSinceHandler := httptransport.NewServer(
-		makeGetIPsActiveSinceEndpoint(svc),
-		decodeGetIPsActiveSinceRequest,
-		encodeResponse,
-	)
-	http.Handle("/getIPDetails", getIPDetailsHandler)
-	http.Handle("/getIPCount", getIPCountHandler)
-	http.Handle("/getIPsActiveSince", getIPsActiveSinceHandler)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+func makeGetIPDetailsEndpoint(svc BlacklistService) endpoint.Endpoint {
+	return func(_ context.Context, request interface{}) (interface{}, error) {
+		req := request.(getIPDetailsRequest)
+		v, err := svc.GetIPDetails(req.S)
+		if err != nil {
+			return getIPDetailsResponse{"", err.Error()}, nil
+		}
+		jsonv, _ := json.Marshal(v)
+		return getIPDetailsResponse{string(jsonv), ""}, nil
+	}
+}
+func makeGetIPCountEndpoint(svc BlacklistService) endpoint.Endpoint {
+	return func(_ context.Context, request interface{}) (interface{}, error) {
+		req := request.(getIPCountRequest)
+		v := svc.GetIPCount(req.S)
+		return getIPCountResponse{v}, nil
+	}
+}
+func makeGetIPsActiveSinceEndpoint(svc BlacklistService) endpoint.Endpoint {
+	return func(_ context.Context, request interface{}) (interface{}, error) {
+		req := request.(getIPsActiveSinceRequest)
+		inputEpoch, err := strconv.ParseInt(req.S, 0, 64)
+		if err != nil {
+			return getIPsActiveSinceResponse{""}, err
+		}
+		v := svc.GetIPsActiveSince(inputEpoch)
+		jsonv, _ := json.Marshal(v)
+		return getIPsActiveSinceResponse{string(jsonv)}, nil
+	}
 }
 
 func decodeGetIPDetailsRequest(_ context.Context, r *http.Request) (interface{}, error) {
